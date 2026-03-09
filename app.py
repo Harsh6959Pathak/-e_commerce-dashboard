@@ -102,6 +102,29 @@ PLOTLY_LAYOUT = dict(
 COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4", "#a855f7", "#ec4899"]
 
 # ─────────────────────────────────────────────
+# NUMBER FORMATTER
+# ─────────────────────────────────────────────
+def fmt(value, prefix="", suffix="", decimals=2):
+    """
+    Format large numbers into readable short form:
+    1,500        → 1.50K
+    1,500,000    → 1.50M
+    1,500,000,000→ 1.50B
+    Applies prefix (e.g. $) and suffix (e.g. %) automatically.
+    """
+    abs_val = abs(value)
+    sign    = "-" if value < 0 else ""
+    if abs_val >= 1_000_000_000:
+        formatted = f"{sign}{prefix}{abs_val/1_000_000_000:.{decimals}f}B{suffix}"
+    elif abs_val >= 1_000_000:
+        formatted = f"{sign}{prefix}{abs_val/1_000_000:.{decimals}f}M{suffix}"
+    elif abs_val >= 1_000:
+        formatted = f"{sign}{prefix}{abs_val/1_000:.{decimals}f}K{suffix}"
+    else:
+        formatted = f"{sign}{prefix}{abs_val:.{decimals}f}{suffix}"
+    return formatted
+
+# ─────────────────────────────────────────────
 # AUTH
 # ─────────────────────────────────────────────
 USERS = {
@@ -250,17 +273,17 @@ def ceo_dashboard(orders, items, refunds, products, year_range):
     conversion_rate = (orders["items_purchased"] == 2).mean() * 100
 
     kpis = [
-        ("💰 Total Revenue",      f"${total_revenue:,.0f}",     None),
-        ("📈 Total Profit",       f"${total_profit:,.0f}",      None),
-        ("🛒 Total Orders",       f"{total_orders:,}",          None),
-        ("📊 Profit Margin %",    f"{profit_margin:.1f}%",      None),
-        ("🔄 Conversion Rate",    f"{conversion_rate:.1f}%",    None),
-        ("📉 Revenue Growth %",   f"{rev_growth:.1f}%",         rev_growth),
-        ("↩️ Refund Amount",     f"${total_refund:,.0f}",       None),
-        ("🔁 Refund Rate",        f"{refund_rate:.1f}%",        None),
-        ("💳 Avg Order Value",    f"${avg_order_value:.2f}",    None),
-        ("💹 Gross Margin %",     f"{gross_margin:.1f}%",       None),
-        ("🧺 Avg Items/Order",    f"{avg_items_per_order:.2f}", None),
+        ("💰 Total Revenue",      fmt(total_revenue,   prefix="$"),         None),
+        ("📈 Total Profit",       fmt(total_profit,    prefix="$"),         None),
+        ("🛒 Total Orders",       fmt(total_orders,    decimals=1),         None),
+        ("📊 Profit Margin %",    f"{profit_margin:.1f}%",                  None),
+        ("🔄 Conversion Rate",    f"{conversion_rate:.1f}%",                None),
+        ("📉 Revenue Growth %",   f"{rev_growth:.1f}%",                     rev_growth),
+        ("↩️ Refund Amount",     fmt(total_refund,    prefix="$"),          None),
+        ("🔁 Refund Rate",        f"{refund_rate:.1f}%",                    None),
+        ("💳 Avg Order Value",    fmt(avg_order_value, prefix="$"),         None),
+        ("💹 Gross Margin %",     f"{gross_margin:.1f}%",                   None),
+        ("🧺 Avg Items/Order",    f"{avg_items_per_order:.2f}",             None),
     ]
 
     # Row 1: first 6 KPIs
@@ -495,13 +518,13 @@ def website_dashboard(orders, items, refunds, products, year_range, sessions=Non
         bounce_rate  = 62.3
 
     kpis = [
-        ("🖥️ Total Sessions",        f"{total_sessions:,}"),
-        ("👥 Users",                  f"{users:,}"),
+        ("🖥️ Total Sessions",        fmt(total_sessions,  decimals=2)),
+        ("👥 Users",                  fmt(users,           decimals=2)),
         ("↩️ Bounce Rate",           f"{bounce_rate:.1f}%" if bounce_rate else "N/A"),
         ("🔄 Conversion Rate",        f"{conversion_rate:.2f}%"),
-        ("💵 Revenue / Session",      f"${rev_per_session:.2f}"),
-        ("🛒 Total Orders",           f"{total_orders:,}"),
-        ("💰 Total Revenue",          f"${total_revenue:,.0f}"),
+        ("💵 Revenue / Session",      fmt(rev_per_session, prefix="$")),
+        ("🛒 Total Orders",           fmt(total_orders,    decimals=1)),
+        ("💰 Total Revenue",          fmt(total_revenue,   prefix="$")),
         ("🛒 Cart Abandonment Rate",  f"{cart_abandon:.1f}%"),
     ]
     cols = st.columns(8)
@@ -709,11 +732,11 @@ def marketing_dashboard(orders, items, refunds, products, year_range, sessions=N
 
     kpis = [
         ("🔍 Gsearch Conversion",   f"{gsearch_conv:.1f}%"),
-        ("🖥️ Total Sessions",       f"{total_sessions:,}"),
-        ("🔁 Repeat Visitors",      f"{repeat_sessions:,}"),
+        ("🖥️ Total Sessions",       fmt(total_sessions,  decimals=2)),
+        ("🔁 Repeat Visitors",      fmt(repeat_sessions, decimals=2)),
         ("📊 Repeat Session Rate",  f"{repeat_rate:.1f}%"),
         ("📅 Avg Gap Days",         f"{avg_gap_days:.1f}"),
-        ("🔃 Repeat Sessions",      f"{repeat_sessions:,}"),
+        ("🔃 Repeat Sessions",      fmt(repeat_sessions, decimals=2)),
         ("🎯 Conversion (Repeat)",  f"{repeat_conv:.1f}%"),
     ]
     cols = st.columns(7)
