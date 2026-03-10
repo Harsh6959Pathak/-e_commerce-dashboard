@@ -6,7 +6,7 @@ A multi-page interactive Business Intelligence Dashboard built with **Streamlit*
 
 ## 🚀 Live Demo
 
-> Deploy on Streamlit Community Cloud and paste your URL here.
+> Deploy on Streamlit Community Cloud (https://pjx8gkqucmqgsnxzjabx45.streamlit.app/).
 
 ---
 
