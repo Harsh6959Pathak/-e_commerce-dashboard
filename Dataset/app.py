@@ -191,19 +191,18 @@ def load_web_data():
     Falls back gracefully to None if files are missing.
     """
     base_path = os.path.dirname(os.path.abspath(__file__))
-    sessions_path  = os.path.join(base_path, "website_sessions_compressed.csv")
-    pageviews_path = os.path.join(base_path, "website_pageviews_compressed.csv")
+    sessions_path  = os.path.join(base_path, "website_sessions.csv")
+    pageviews_path = os.path.join(base_path, "website_pageviews.csv")
 
     sessions  = None
     pageviews = None
 
     if os.path.exists(sessions_path):
-        sessions = pd.read_csv(sessions_path)
-        # Decode integer-encoded columns back to readable strings
-        sessions["utm_source"]  = sessions["utm_source"].map(UTM_SOURCE_MAP)
-        sessions["device_type"] = sessions["device_type"].map(DEVICE_TYPE_MAP)
-        # Derive year and session_type from stored columns
-        sessions["year"]         = sessions["month"].str[:4].astype(int)
+        sessions = pd.read_csv(sessions_path, parse_dates=["created_at"])
+        # Original file already has readable strings — no decoding needed
+        # Derive helper columns
+        sessions["month"]        = sessions["created_at"].dt.to_period("M").astype(str)
+        sessions["year"]         = sessions["created_at"].dt.year
         sessions["session_type"] = sessions["is_repeat_session"].map({0: "New", 1: "Repeat"})
 
     if os.path.exists(pageviews_path):
@@ -256,12 +255,20 @@ def ceo_dashboard(orders, items, refunds, products, year_range):
     total_revenue   = orders["revenue"].sum()
     total_profit    = orders["profit"].sum()
     total_orders    = len(orders)
-    profit_margin   = (total_profit / total_revenue * 100) if total_revenue else 0
-    avg_order_value = orders["revenue"].mean()
-    gross_margin    = profit_margin
-    avg_items_per_order = orders["items_purchased"].mean()
+    total_cogs      = orders["cogs_usd"].sum()
     total_refund    = refunds["refund_amount_usd"].sum()
     refund_rate     = (len(refunds) / total_orders * 100) if total_orders else 0
+
+    # Profit Margin: does NOT subtract refunds (gross view of price vs cost)
+    profit_margin   = (total_profit / total_revenue * 100) if total_revenue else 0
+
+    # Gross Margin: subtracts refunds from both revenue and profit (accurate)
+    actual_revenue  = total_revenue - total_refund
+    actual_profit   = actual_revenue - total_cogs
+    gross_margin    = (actual_profit / actual_revenue * 100) if actual_revenue else 0
+
+    avg_order_value     = orders["revenue"].mean()
+    avg_items_per_order = orders["items_purchased"].mean()
 
     # # Revenue growth (compare first half vs second half of filtered data)
     # mid_year = (year_range[0] + year_range[1]) // 2
@@ -506,13 +513,23 @@ def website_dashboard(orders, items, refunds, products, year_range, sessions=Non
     conversion_rate = (total_orders / total_sessions * 100) if total_sessions else 0
     rev_per_session = total_revenue / total_sessions if total_sessions else 0
 
-    # Cart abandonment: sessions that hit /cart but not /thank-you
+    # Cart abandonment + Bounce Rate
     if has_real_web_data and pageviews is not None:
-        cart_sessions    = set(pageviews[pageviews["pageview_url"] == "/cart"]["website_session_id"])
-        thankyou_sessions= set(pageviews[pageviews["pageview_url"].str.contains("thank", na=False)]["website_session_id"])
-        abandoned        = cart_sessions - thankyou_sessions
-        cart_abandon     = (len(abandoned) / len(cart_sessions) * 100) if cart_sessions else 0
-        bounce_rate      = 0.0  # no single-page-view data available without full session table
+        # ── Cart Abandonment ──
+        # Sessions that reached /cart but never hit /thank-you
+        cart_sessions     = set(pageviews[pageviews["pageview_url"] == "/cart"]["website_session_id"])
+        thankyou_sessions = set(pageviews[pageviews["pageview_url"].str.contains("thank", na=False)]["website_session_id"])
+        abandoned         = cart_sessions - thankyou_sessions
+        cart_abandon      = (len(abandoned) / len(cart_sessions) * 100) if cart_sessions else 0
+
+        # ── Bounce Rate ──
+        # Step 1 — Count how many pageviews each session has
+        pageviews_per_session = pageviews.groupby("website_session_id")["pageview_url"].count()
+        # Step 2 — A bounce = session with only 1 pageview
+        bounced_sessions      = (pageviews_per_session == 1).sum()
+        total_tracked         = len(pageviews_per_session)
+        # Step 3 — Bounce Rate %
+        bounce_rate           = (bounced_sessions / total_tracked * 100) if total_tracked else 0
     else:
         cart_abandon = 74.2
         bounce_rate  = 62.3
